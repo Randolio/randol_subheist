@@ -1,6 +1,5 @@
 local Config = lib.require('config')
 local subGunners = {}
-local hackAttempts = 0
 local isTimerActive = false
 local startTime = 0
 local elapsedTime = 0
