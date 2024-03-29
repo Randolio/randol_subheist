@@ -20,8 +20,8 @@ A submarine heist that allows you to breach a submarine and combat your way thro
 
 ## Requirements
 
-[ox_lib](https://github.com/overextended/ox_lib/releases)
-[ps-ui](https://github.com/Project-Sloth/ps-ui) (optional)
+* [ox_lib](https://github.com/overextended/ox_lib/releases)
+* [ps-ui](https://github.com/Project-Sloth/ps-ui) (optional)
 
 ## Showcase
 
