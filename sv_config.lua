@@ -1,7 +1,7 @@
 return {
     BlacklistedGuns = { -- Weapons a player is not allowed to use. It will search their inventory for these weapons so make sure you add them correctly.
         'WEAPON_SNIPERRIFLE',
-        'WEAPON_HEAVYNSIPER',
+        'WEAPON_HEAVYSNIPER',
     },
     PlayerCooldown = 60, -- minutes before a individual player can attempt another submarine heist.
     HackLocation = vec3(515.79, 4835.66, -68.99),
