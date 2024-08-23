@@ -3,7 +3,20 @@ local subGunners = {}
 local isTimerActive = false
 local startTime = 0
 local elapsedTime = 0
-local tempTimer, formattedTime, deltaTime, hackSpot, subStart, BLOCKING_DOOR, SUB_ALARM
+local tempTimer, formattedTime, deltaTime, hackSpot, hackZone, subStart, BLOCKING_DOOR, SUB_ALARM
+
+local function targetLocalEntity(entity, options, distance)
+    if GetResourceState('ox_target') == 'started' then
+        for _, option in ipairs(options) do
+            option.distance = distance
+            option.onSelect = option.action
+            option.action = nil
+        end
+        exports.ox_target:addLocalEntity(entity, options)
+    else
+        exports['qb-target']:AddTargetEntity(entity, { options = options, distance = distance })
+    end
+end
 
 local function drawTime(text, font, x, y, scale, r, g, b, a)
     SetTextFont(font)
@@ -139,27 +152,50 @@ local function createAngryDudes()
     end
 
     SetModelAsNoLongerNeeded(model)
-    exports['qb-target']:AddCircleZone('hackSpot', vec3(hackSpot.x, hackSpot.y, hackSpot.z), 0.6,{
-        name = 'hackSpot', 
-        debugPoly = false, 
-        useZ=true, 
-    }, { options = {
-        { 
-            icon = 'fa-solid fa-server', 
-            label = 'Hack',
-            action = exitSubmarine,
-        },}, 
-        distance = 1.5 
-    })
+    if GetResourceState('ox_target') == 'started' then
+        hackZone = exports.ox_target:addSphereZone({
+            coords = vec3(hackSpot.x, hackSpot.y, hackSpot.z),
+            radius = 0.6,
+            debug = false,
+            options = {
+                { 
+                    icon = 'fa-solid fa-server', 
+                    label = 'Hack',
+                    onSelect = exitSubmarine,
+                    distance = 1.5,
+                },
+            }
+        })
+    else
+        exports['qb-target']:AddCircleZone('hackSpot', vec3(hackSpot.x, hackSpot.y, hackSpot.z), 0.6,{
+            name = 'hackSpot', 
+            debugPoly = false, 
+            useZ=true, 
+        }, { options = {
+                { 
+                    icon = 'fa-solid fa-server', 
+                    label = 'Hack',
+                    action = exitSubmarine,
+                },
+            }, 
+            distance = 1.5 
+        })
+        hackZone = 'hackSpot'
+    end
 end
 
 local function resetEverything()
     isTimerActive = false
     deleteAngryDudes()
-    if hackSpot then
-        exports['qb-target']:RemoveZone('hackSpot')
-        hackSpot = nil
+    if hackZone then
+        if GetResourceState('ox_target') == 'started' then
+            exports.ox_target:removeZone(hackZone)
+        else
+            exports['qb-target']:RemoveZone(hackZone)
+        end
+        hackZone = nil
     end
+    hackSpot = nil
     toggleBlockingDoor(false)
     setAmbience(false)
     LocalPlayer.state.heistActive = false
@@ -188,48 +224,49 @@ local function spawnPed()
     TaskStartScenarioInPlace(START_PED, Config.Ped.scenario, 0, false)
     SetModelAsNoLongerNeeded(Config.Ped.model)
 
-    exports['qb-target']:AddTargetEntity(START_PED, { 
-        options = {
-            {
-                num = 1,
-                icon = 'fa-solid fa-medal',
-                label = 'View Leaderboard',
-                action = function()
-                    local leaderBoard = {} 
-                    local data = lib.callback.await('randol_subheist:server:getBoard', false)
-                    for k, v in pairs(data) do
-                        leaderBoard[#leaderBoard + 1] = {
-                            title = ('#%s - %s'):format(k, v.name),
-                            icon = 'fa-solid fa-medal',
-                            description = ('Time: %s'):format(v.record),
-                        }
-                    end
-                    lib.registerContext({ id = 'heist_ldb', title = 'Leaderboard', options = leaderBoard })
-                    lib.showContext('heist_ldb')
-                end,
-            },
-            {
-                num = 2,
-                icon = 'fa-solid fa-person-rifle',
-                label = 'Start Heist',
-                action = function()
-                    local success, spot = lib.callback.await('randol_subheist:server:canStart', false)
-                    if not success then return end
-                    hackSpot = spot
-                    enterSubmarine()
-                end,
-                canInteract = function()
-                    return not LocalPlayer.state.heistActive
-                end,
-            },
-        }, 
-        distance = 1.5, 
-    })
+    targetLocalEntity(START_PED, {
+        {
+            num = 1,
+            icon = 'fa-solid fa-medal',
+            label = 'View Leaderboard',
+            action = function()
+                local leaderBoard = {} 
+                local data = lib.callback.await('randol_subheist:server:getBoard', false)
+                for k, v in pairs(data) do
+                    leaderBoard[#leaderBoard + 1] = {
+                        title = ('#%s - %s'):format(k, v.name),
+                        icon = 'fa-solid fa-medal',
+                        description = ('Time: %s'):format(v.record),
+                    }
+                end
+                lib.registerContext({ id = 'heist_ldb', title = 'Leaderboard', options = leaderBoard })
+                lib.showContext('heist_ldb')
+            end,
+        },
+        {
+            num = 2,
+            icon = 'fa-solid fa-person-rifle',
+            label = 'Start Heist',
+            action = function()
+                local success, spot = lib.callback.await('randol_subheist:server:canStart', false)
+                if not success then return end
+                hackSpot = spot
+                enterSubmarine()
+            end,
+            canInteract = function()
+                return not LocalPlayer.state.heistActive
+            end,
+        },
+    }, 1.5)
 end
 
 local function yeetPed()
     if not DoesEntityExist(START_PED) then return end
-    exports['qb-target']:RemoveTargetEntity(START_PED, {'View Leaderboard', 'Start Heist'})
+    if GetResourceState('ox_target') == 'started' then
+        exports.ox_target:removeLocalEntity(START_PED, {'View Leaderboard', 'Start Heist'})
+    else
+        exports['qb-target']:RemoveTargetEntity(START_PED, {'View Leaderboard', 'Start Heist'})
+    end
     DeleteEntity(START_PED)
     START_PED = nil
 end
@@ -259,7 +296,14 @@ end
 function exitSubmarine()
     if not LocalPlayer.state.heistActive then return end
 
-    exports['qb-target']:RemoveZone('hackSpot')
+    if hackZone then
+        if GetResourceState('ox_target') == 'started' then
+            exports.ox_target:removeZone(hackZone)
+        else
+            exports['qb-target']:RemoveZone(hackZone)
+        end
+        hackZone = nil
+    end
     hackSpot = nil
 
     local success, position, message
